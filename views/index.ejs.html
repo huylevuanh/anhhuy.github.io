@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+
+<body>
+
+    <title>Video/Canvas Demo 1</title>
+
+    <canvas id=c></canvas>
+    <video id=v controls loop>
+
+        <source src="mov_bbb.mp4" type="video/mp4">
+        <p>Your browser doesn't support HTML5 video. Here is a <a href="move_bbb.mp4">link to the video</a> instead.</p>
+    </video>
+
+</body>
+
+</html>
+
+
+<script>
+    document.addEventListener('DOMContentLoaded',
+        function () {
+            var v = document.getElementById('v');
+            var canvas = document.getElementById('c');
+            var context = canvas.getContext('2d');
+            var back = document.createElement('canvas');
+            var backcontext = back.getContext('2d');
+
+            var cw, ch;
+
+            v.addEventListener('play', function () {
+                cw = v.clientWidth;
+                ch = v.clientHeight;
+                canvas.width = cw;
+                canvas.height = ch;
+                back.width = cw;
+                back.height = ch;
+                draw(v, context, backcontext, cw, ch);
+            }, false);
+
+        }, false);
+    function gray_scale(video) {
+        for (var i = 0; i < video.length; i += 4) {
+            var r = video.data[i];
+            var g = video.data[i + 1];
+            var b = video.data[i + 2];
+            var brightness = (3 * r + 4 * g + b) >>> 3;
+            video.data[i] = brightness;
+            video.data[i + 1] = brightness;
+            video.data[i + 2] = brightness;
+        }
+        return video;
+    }
+    function setRGB(v, x, y, rgb) {
+        v.data[((y * (4 * v.width)) + (4 * x)) + 0] = rgb[0];
+        v.data[((y * (4 * v.width)) + (4 * x)) + 1] = rgb[1];
+        v.data[((y * (4 * v.width)) + (4 * x)) + 2] = rgb[2];
+        v.data[((y * (4 * v.width)) + (4 * x)) + 3] = 255;
+    }
+    function sobel(idata, x, y) {
+        var gradX = 0;
+        var gradY = 0;
+
+        gradX += idata.data[(((y - 1) * (4 * idata.width)) + (4 * (x - 1)))] * -1;
+        gradX += idata.data[((y * (4 * idata.width)) + (4 * (x - 1)))] * -2;
+        gradX += idata.data[(((y + 1) * (4 * idata.width)) + (4 * (x - 1)))] * -1;
+        gradX += idata.data[(((y - 1) * (4 * idata.width)) + (4 * (x + 1)))] * 1;
+        gradX += idata.data[((y * (4 * idata.width)) + (4 * (x + 1)))] * 2;
+        gradX += idata.data[(((y + 1) * (4 * idata.width)) + (4 * (x + 1)))] * 1;
+
+        gradY += idata.data[(((y - 1) * (4 * idata.width)) + (4 * (x - 1)))] * -1;
+        gradY += idata.data[(((y - 1) * (4 * idata.width)) + (4 * x))] * -2;
+        gradY += idata.data[(((y - 1) * (4 * idata.width)) + (4 * (x + 1)))] * -1;
+        gradY += idata.data[(((y + 1) * (4 * idata.width)) + (4 * (x - 1)))] * 1;
+        gradY += idata.data[(((y + 1) * (4 * idata.width)) + (4 * x))] * 2;
+        gradY += idata.data[(((y + 1) * (4 * idata.width)) + (4 * (x + 1)))] * 1;
+
+        gradX /= 9;
+        gradY /= 9;
+
+        return Math.sqrt(Math.pow(gradX, 2) + Math.pow(gradY, 2));
+    }
+
+    function draw(v, c, bc, w, h) {
+        if (v.paused || v.ended) return false;
+        // First, draw it into the backing canvas
+        bc.drawImage(v, 0, 0, w, h);
+        // Grab the pixel data from the backing canvas
+        var idata = bc.getImageData(0, 0, w, h);
+        var gray_data = gray_scale(idata);
+        var buffer = bc.createImageData(gray_data);
+        // Loop through the pixels
+        for (var x = 1; x < w - 1; x++) {
+            for (var y = 1; y < h - 1; y++) {
+                var sobel_value = sobel(gray_data,x,y) * 3;
+                setRGB(buffer,x,y,[sobel_value,sobel_value,sobel_value]);
+             }
+             c.putImageData(buffer, 0, 0);
+        }
+
+
+        // Draw the pixels onto the visible canvas
+        //c.putImageData(idata, 0, 0);
+        // Start over!
+        setTimeout(function () { draw(v, c, bc, w, h); }, 0);
+    }
+</script>
